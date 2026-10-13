@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import postgres from 'postgres'
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
-import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk'
+import { AccessToken, DataPacket_Kind, RoomServiceClient, TrackSource } from 'livekit-server-sdk'
 
 function env(key: string, fallback?: string): string {
   const v = process.env[key] ?? fallback
@@ -184,6 +184,23 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
       return [r.name, people] as const
     }))
     return [200, Object.fromEntries(entries.filter(([, people]) => people.length > 0))]
+  }
+
+  // Move outra pessoa de canal (como o "Mover para" do Discord)
+  // ponytail: qualquer um no mesmo canal pode mover; restringir por cargo quando houver permissões
+  if (path === 'POST /move') {
+    const { room, identity, to } = await readJson(req)
+    const validRoom = (r: unknown): r is string => typeof r === 'string' && ROOM_RE.test(r)
+    if (!validRoom(room) || !validRoom(to) || room === to) throw new HttpError(400, 'Canal inválido')
+    if (!validName(identity)) throw new HttpError(400, 'Usuário inválido')
+    // Sala vazia ou inexistente: o LiveKit responde erro, tratamos como ninguém lá
+    const present = new Set((await roomService.listParticipants(room).catch(() => [])).map((p) => p.identity))
+    if (!present.has(name) || !present.has(identity)) throw new HttpError(403, 'Vocês precisam estar no mesmo canal')
+    // moveParticipant só existe no LiveKit Cloud; uma mensagem do servidor funciona também no open source.
+    // O app da pessoa só obedece mensagens vindas do servidor (sem participante remetente).
+    const payload = new TextEncoder().encode(JSON.stringify({ to }))
+    await roomService.sendData(room, payload, DataPacket_Kind.RELIABLE, { destinationIdentities: [identity], topic: 'move' })
+    return [200, {}]
   }
 
   if (path === 'POST /logout') {

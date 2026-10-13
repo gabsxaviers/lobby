@@ -89,10 +89,40 @@ body { margin: 0; }
 
 .call { display: flex; flex-direction: column; height: 100%; }
 .call .lk-control-bar { position: relative; flex-wrap: wrap; }
-.volumes { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; min-width: 280px; padding: 12px; background: #2b2d31; border-radius: 8px; box-shadow: 0 4px 16px #0008; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
-.volumes[hidden] { display: none; }
-.volumes p { margin: 0; color: #949ba4; }
-.volumes label { display: grid; grid-template-columns: 1fr 120px 40px; align-items: center; gap: 8px; font-size: 14px; }
+.user-menu {
+  position: fixed;
+  z-index: 30;
+  width: 220px;
+  padding: 6px;
+  border-radius: 6px;
+  background: #111214;
+  box-shadow: 0 8px 24px #000a;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+.user-menu .menu-title { padding: 6px 8px; font-weight: 700; color: #f2f3f5; }
+.user-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: #dbdee1;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.user-menu button:hover, .user-menu button:focus-visible { background: #5865f2; color: #fff; outline: none; }
+.user-menu .menu-check { margin-left: auto; }
+.menu-volume { display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; padding: 6px 8px 8px; color: #b5bac1; font-size: 12px; }
+.menu-volume input { grid-column: 1; accent-color: #5865f2; }
+.menu-volume span { grid-column: 2; grid-row: 2; align-self: center; min-width: 36px; text-align: right; }
+.menu-sep { height: 1px; margin: 4px 6px; background: #2b2d31; }
+.menu-label { padding: 4px 8px 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #949ba4; }
 .lk-button.deaf[aria-pressed='true'] { background: #f23f43; }
 
 .toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #f23f43; color: #fff; padding: 10px 16px; border-radius: 6px; box-shadow: 0 4px 16px #0008; cursor: pointer; z-index: 20; }

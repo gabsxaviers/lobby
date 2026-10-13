@@ -90,7 +90,14 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
       </nav>
       <main>
         {conn ? (
-          <Call key={conn.room} conn={conn} onLeave={() => setConn(null)} onError={setToast} />
+          <Call
+            key={conn.room}
+            conn={conn}
+            channels={CHANNELS}
+            onLeave={() => setConn(null)}
+            onMoved={(room) => CHANNELS.includes(room) && join(room)}
+            onError={setToast}
+          />
         ) : (
           <p className="empty">Escolha um canal para entrar.</p>
         )}

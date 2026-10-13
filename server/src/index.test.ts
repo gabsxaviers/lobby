@@ -48,6 +48,10 @@ test('cadastro, login e token do LiveKit', async (t) => {
   assert.equal(claims.video.room, 'geral')
   assert.equal(claims.video.roomJoin, true)
 
+  // Mover exige que os dois estejam no mesmo canal (aqui ninguém está conectado)
+  assert.equal((await post('/move', { room: 'geral', identity: 'alguem', to: 'jogos' }, session)).status, 403)
+  assert.equal((await post('/move', { room: 'geral', identity: 'alguem', to: 'geral' }, session)).status, 400)
+
   assert.equal((await post('/logout', {}, session)).status, 200)
   assert.equal((await post('/livekit-token', { room: 'geral' }, session)).status, 401)
 })
