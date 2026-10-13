@@ -1,0 +1,47 @@
+# docker compose up -d  →  http://localhost:5173
+# Ambiente de desenvolvimento: LiveKit em modo dev (devkey/secret). Não usar em produção.
+name: lobby
+
+services:
+  livekit:
+    container_name: lobby_livekit
+    image: livekit/livekit-server:v1.13.7
+    command: --dev --bind 0.0.0.0 --node-ip 127.0.0.1
+    ports:
+      - "7880:7880"     # HTTP/WebSocket (sinalização)
+      - "7881:7881"     # WebRTC via TCP (fallback)
+      - "7882:7882/udp" # WebRTC via UDP (mídia)
+
+  api:
+    container_name: lobby_api
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm start"
+    environment:
+      PORT: 3001
+      WEB_ORIGINS: http://localhost:5173
+      DB_PATH: /data/lobby.db
+      LIVEKIT_URL: ws://localhost:7880 # endereço visto pelo navegador
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: secret
+    volumes:
+      - ./server:/app
+      - /app/node_modules # node_modules do Linux, separado do Windows
+      - db:/data
+    ports:
+      - "3001:3001"
+
+  web:
+    container_name: lobby_web
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on: [api, livekit]
+
+volumes:
+  db:

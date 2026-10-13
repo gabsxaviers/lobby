@@ -1,0 +1,32 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #111214;
+  color: #dbdee1;
+}
+body { margin: 0; }
+#root { height: 100vh; }
+
+.login {
+  max-width: 320px;
+  margin: 15vh auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.login label { display: flex; flex-direction: column; gap: 4px; }
+.login input { padding: 8px; border-radius: 6px; border: 1px solid #3f4147; background: #1e1f22; color: inherit; }
+.login .row { display: flex; gap: 8px; }
+.error { color: #f23f43; margin: 0; }
+
+.lobby { display: flex; height: 100%; }
+.lobby nav { width: 220px; background: #1e1f22; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.lobby nav h2 { font-size: 12px; text-transform: uppercase; color: #949ba4; }
+.lobby nav footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+.channel { text-align: left; padding: 6px 8px; border: 0; border-radius: 4px; background: none; color: #949ba4; cursor: pointer; }
+.channel:hover, .channel.active { background: #35373c; color: #fff; }
+.lobby main { flex: 1; min-width: 0; }
+.empty { text-align: center; margin-top: 30vh; color: #949ba4; }
+
+.call { display: flex; flex-direction: column; height: 100%; }
+.call .stage { flex: 1; min-height: 0; }
