@@ -6,11 +6,11 @@ import {
   useRoomInfo, useTracks,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
-import {
-  Check, HeadphoneOff, Headphones, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, Volume2, VolumeX,
-} from 'lucide-react'
+import { HeadphoneOff, Headphones, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, VolumeX } from 'lucide-react'
 import { api } from './api'
 import { SCREEN_PRESETS, type ScreenPresetId } from './screenShare'
+import { useUserAudio } from './userAudio'
+import { UserMenu } from './UserMenu'
 
 export type Connection = { room: string; url: string; token: string }
 
@@ -93,38 +93,23 @@ function Stage({ channels, onError }: StageProps) {
   )
 }
 
-type UserAudio = { volume: number; muted: boolean }
-
-// Volume e silenciar são locais (só você deixa de ouvir) e ficam salvos no navegador por pessoa
-function useUserAudio(participant: Participant) {
-  const key = `audio:${participant.identity}`
-  const [audio, setAudio] = useState<UserAudio>(() => {
-    try {
-      return { volume: 100, muted: false, ...JSON.parse(localStorage.getItem(key) ?? '{}') }
-    } catch {
-      return { volume: 100, muted: false }
-    }
-  })
-  useEffect(() => {
-    if (!(participant instanceof RemoteParticipant)) return
-    // ponytail: máximo 100%; acima disso exige webAudioMix no LiveKitRoom
-    participant.setVolume(audio.muted ? 0 : audio.volume / 100)
-    localStorage.setItem(key, JSON.stringify(audio))
-  }, [participant, key, audio])
-  return [audio, setAudio] as const
-}
-
 type TileProps = { participant: Participant; channels: string[]; onError: (message: string) => void }
 
 function VoiceTile({ participant, channels, onError }: TileProps) {
   const speaking = useIsSpeaking(participant)
   const micMuted = useIsMuted({ participant, source: Track.Source.Microphone })
-  const [audio, setAudio] = useUserAudio(participant)
+  const name = participant.identity
+  const [audio] = useUserAudio(name)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
   const room = useRoomInfo().name
-  const name = participant.identity
   const remote = participant instanceof RemoteParticipant
+
+  // Aplica o volume/silenciar escolhido (no card ou na lista lateral) ao áudio desta pessoa
+  useEffect(() => {
+    // ponytail: máximo 100%; acima disso exige webAudioMix no LiveKitRoom
+    if (participant instanceof RemoteParticipant) participant.setVolume(audio.muted ? 0 : audio.volume / 100)
+  }, [participant, audio])
   // Cor fixa por nome, para cada pessoa ser reconhecível
   const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0)
 
@@ -149,86 +134,7 @@ function VoiceTile({ participant, channels, onError }: TileProps) {
         {audio.muted && <VolumeX size={14} aria-label="Silenciado por você" />}
       </span>
       {menu && (
-        <UserMenu
-          {...menu}
-          name={name}
-          audio={audio}
-          setAudio={setAudio}
-          channels={channels.filter((c) => c !== room)}
-          onMove={move}
-          onClose={closeMenu}
-        />
-      )}
-    </div>
-  )
-}
-
-type MenuProps = {
-  x: number
-  y: number
-  name: string
-  audio: UserAudio
-  setAudio: (a: UserAudio) => void
-  channels: string[]
-  onMove: (to: string) => void
-  onClose: () => void
-}
-
-function UserMenu({ x, y, name, audio, setAudio, channels, onMove, onClose }: MenuProps) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  // Mantém o menu dentro da tela (abre para cima/esquerda perto das bordas)
-  useEffect(() => {
-    const el = ref.current!
-    const { width, height } = el.getBoundingClientRect()
-    el.style.left = `${Math.max(8, Math.min(x, innerWidth - width - 8))}px`
-    el.style.top = `${Math.max(8, Math.min(y, innerHeight - height - 8))}px`
-    el.querySelector<HTMLElement>('input, button')?.focus()
-  }, [x, y])
-
-  useEffect(() => {
-    const el = ref.current!
-    const outside = (e: PointerEvent) => { if (!el.contains(e.target as Node)) onClose() }
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('pointerdown', outside)
-    document.addEventListener('keydown', key)
-    window.addEventListener('resize', onClose)
-    return () => {
-      document.removeEventListener('pointerdown', outside)
-      document.removeEventListener('keydown', key)
-      window.removeEventListener('resize', onClose)
-    }
-  }, [onClose])
-
-  return (
-    <div ref={ref} className="user-menu" role="menu" aria-label={`Opções de ${name}`} style={{ left: x, top: y }} onContextMenu={(e) => e.preventDefault()}>
-      <div className="menu-title">{name}</div>
-      <label className="menu-volume">
-        Volume do usuário
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={audio.volume}
-          disabled={audio.muted}
-          onChange={(e) => setAudio({ ...audio, volume: Number(e.target.value) })}
-        />
-        <span>{audio.volume}%</span>
-      </label>
-      <button role="menuitemcheckbox" aria-checked={audio.muted} onClick={() => setAudio({ ...audio, muted: !audio.muted })}>
-        <VolumeX size={16} /> Silenciar
-        {audio.muted && <Check size={16} className="menu-check" />}
-      </button>
-      {channels.length > 0 && (
-        <>
-          <div className="menu-sep" role="separator" />
-          <div className="menu-label">Mover para</div>
-          {channels.map((c) => (
-            <button key={c} role="menuitem" onClick={() => { onMove(c); onClose() }}>
-              <Volume2 size={16} /> {c}
-            </button>
-          ))}
-        </>
+        <UserMenu {...menu} name={name} moveTo={channels.filter((c) => c !== room)} onMove={move} onClose={closeMenu} />
       )}
     </div>
   )

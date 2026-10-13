@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { LogOut, MicOff, Volume2 } from 'lucide-react'
 import { api, session } from './api'
 import { Auth } from './Auth'
 import { Call, type Connection } from './Call'
+import { UserMenu } from './UserMenu'
 
 // ponytail: canais fixos no front; mover para o backend quando houver criação de canais
 const CHANNELS = ['geral', 'jogos', 'estudo']
@@ -28,6 +29,8 @@ export default function App() {
 function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
   const [conn, setConn] = useState<Connection | null>(null)
   const [presence, setPresence] = useState<Record<string, Person[]>>({})
+  const [menu, setMenu] = useState<{ x: number; y: number; name: string; channel: string } | null>(null)
+  const closeMenu = useCallback(() => setMenu(null), [])
 
   useEffect(() => {
     const load = () => api<Record<string, Person[]>>('/presence').then(setPresence).catch(() => {})
@@ -55,6 +58,17 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
     }
   }
 
+  function openMenu(e: MouseEvent, name: string, channel: string) {
+    if (name === user) return
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, name, channel })
+  }
+
+  function move(name: string, to: string) {
+    if (!conn) return
+    api('/move', { room: conn.room, identity: name, to }).catch((err) => setToast((err as Error).message))
+  }
+
   async function logout() {
     await api('/logout', {}).catch(() => {})
     session.set(null)
@@ -72,7 +86,7 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
             </button>
             <ul className="people">
               {presence[c]?.map((p) => (
-                <li key={p.name}>
+                <li key={p.name} onContextMenu={(e) => openMenu(e, p.name, c)}>
                   {p.name}
                   {p.muted && <MicOff size={14} aria-label="Microfone desligado" />}
                   {p.screen && <span className="live">AO VIVO</span>}
@@ -102,6 +116,15 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
           <p className="empty">Escolha um canal para entrar.</p>
         )}
       </main>
+      {menu && (
+        <UserMenu
+          {...menu}
+          // Só dá para mover quem está no mesmo canal que você (o servidor também confere)
+          moveTo={menu.channel === conn?.room ? CHANNELS.filter((c) => c !== conn.room) : []}
+          onMove={(to) => move(menu.name, to)}
+          onClose={closeMenu}
+        />
+      )}
       {toast && <div role="alert" className="toast" onClick={() => setToast('')}>{toast}</div>}
     </div>
   )
