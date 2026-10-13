@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { LogOut, MicOff, Volume2 } from 'lucide-react'
 import { api, session } from './api'
 import { Auth } from './Auth'
+import logo from './assets/logo.png'
 import { Call, type Connection } from './Call'
 import { UserMenu } from './UserMenu'
 
@@ -78,6 +79,7 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
   return (
     <div className="lobby" data-lk-theme="default">
       <nav>
+        <img src={logo} alt="Lobby" className="nav-logo" />
         <h2>Canais de voz</h2>
         {CHANNELS.map((c) => (
           <div key={c}>

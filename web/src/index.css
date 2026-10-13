@@ -34,6 +34,8 @@ body { margin: 0; }
 @keyframes auth-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
 @media (prefers-reduced-motion: reduce) { .auth-card { animation: none; } }
 .auth-card header { text-align: center; }
+.auth-logo { display: block; width: 200px; max-width: 70%; height: auto; margin: 0 auto 16px; }
+.nav-logo { display: block; width: 140px; height: auto; margin: 4px 0 8px 4px; }
 .auth-card h1 { margin: 0 0 6px; font-size: 24px; color: #f2f3f5; }
 .auth-card header p { margin: 0; color: #b5bac1; }
 .auth-card label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #b5bac1; }

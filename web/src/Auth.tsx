@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, session } from './api'
+import logo from './assets/logo.png'
 
 type Mode = 'login' | 'register'
 type NameStatus = 'idle' | 'checking' | 'available' | 'taken'
@@ -75,6 +76,7 @@ export function Auth({ onLogin }: { onLogin: (name: string) => void }) {
     <div className="auth">
       <form className="auth-card" onSubmit={submit} key={mode}>
         <header>
+          <img src={logo} alt="Lobby" className="auth-logo" />
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </header>
