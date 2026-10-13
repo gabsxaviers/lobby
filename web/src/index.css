@@ -147,7 +147,55 @@ h1, h2 { font-family: var(--font-title); }
 .call .stage { flex: 1; min-height: 0; box-sizing: border-box; }
 /* A LiveKit fixa max-height: 69px; com o chat aberto os botões quebram linha e ficariam cortados */
 .call .lk-control-bar { position: relative; flex-wrap: wrap; max-height: none; flex-shrink: 0; border-top: 1px solid var(--border); }
-.lk-button.deaf[aria-pressed='true'] { background: var(--danger); color: var(--on-accent); }
+/* Barra só com ícones (estilo Discord): grupos arredondados, vermelho = desligado, laranja = transmitindo */
+.call .call-controls { gap: 12px; justify-content: center; padding: 12px; }
+.control-group { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.call .call-controls .ctl {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.call .call-controls .ctl:hover { background: var(--surface-3); }
+.call .call-controls .ctl.off { background: #ff6b6b38; color: var(--danger); }
+.call .call-controls .ctl.off:hover { background: #ff6b6b52; }
+.call .call-controls .ctl.on { background: var(--accent); color: var(--on-accent); }
+.call .call-controls .ctl.on:hover { background: var(--accent-hover); }
+.call .call-controls .ctl-chevron { min-width: 26px; padding: 0 4px; color: var(--text-2); }
+.call .call-controls .ctl:disabled { opacity: 0.45; cursor: not-allowed; background: none; }
+/* Ícone branco sobre este vermelho: 3,9:1 (mínimo para ícones é 3:1) */
+.call .call-controls .ctl.hangup { min-width: 58px; height: 44px; border-radius: 12px; background: #e5484d; color: #fff; }
+.call .call-controls .ctl.hangup:hover { background: #c93a3f; }
+
+.preset-menu { position: relative; display: flex; }
+/* .preset-menu na frente: senão o position: fixed do .user-menu (declarado depois) ganha */
+.preset-menu .preset-list { position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%); width: 230px; }
+
+/* Tooltip no hover/foco do teclado, sem JS */
+[data-tooltip]:hover::after, [data-tooltip]:focus-visible::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #0d0d0d;
+  color: var(--text);
+  font: 600 13px/1.2 var(--font-ui);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px #000a;
+  pointer-events: none;
+  z-index: 40;
+}
 
 .voice-grid { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 12px; padding: 16px; overflow: auto; }
 .voice-tile {

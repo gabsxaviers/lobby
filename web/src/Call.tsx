@@ -6,7 +6,9 @@ import {
   useRoomInfo, useTracks,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
-import { HeadphoneOff, Headphones, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, VolumeX } from 'lucide-react'
+import {
+  Check, ChevronDown, HeadphoneOff, Headphones, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, VolumeX,
+} from 'lucide-react'
 import { api } from './api'
 import { nameColor } from './avatar'
 import { chatEvents } from './chatEvents'
@@ -171,37 +173,107 @@ function Controls({ deaf, setDeaf }: { deaf: boolean; setDeaf: (d: boolean) => v
     setDeaf(!deaf)
   }
 
+  const micLabel = isMicrophoneEnabled ? 'Silenciar' : 'Dessilenciar'
+  const deafLabel = deaf ? 'Ativar áudio' : 'Desativar áudio'
+  const shareLabel = sharing ? 'Parar transmissão' : 'Transmitir tela'
+
+  // Só ícones, como no Discord: o texto vira tooltip (data-tooltip) e aria-label
   return (
-    <div className="lk-control-bar">
-      <TrackToggle source={Track.Source.Microphone} showIcon={false}>
-        {isMicrophoneEnabled ? <Mic size={ICON} /> : <MicOff size={ICON} />} Microfone
-      </TrackToggle>
-      <MediaDeviceMenu kind="audioinput" title="Escolher microfone" />
-      <button className="lk-button deaf" aria-pressed={deaf} onClick={toggleDeaf}>
-        {deaf ? <><HeadphoneOff size={ICON} /> Voltar a ouvir</> : <><Headphones size={ICON} /> Silenciar tudo</>}
+    <div className="lk-control-bar call-controls">
+      <div className="control-group">
+        <TrackToggle
+          source={Track.Source.Microphone}
+          showIcon={false}
+          className={isMicrophoneEnabled ? 'ctl' : 'ctl off'}
+          aria-label={micLabel}
+          data-tooltip={micLabel}
+        >
+          {isMicrophoneEnabled ? <Mic size={ICON} /> : <MicOff size={ICON} />}
+        </TrackToggle>
+        <MediaDeviceMenu kind="audioinput" className="ctl ctl-chevron" aria-label="Escolher microfone" data-tooltip="Microfone">
+          <ChevronDown size={14} />
+        </MediaDeviceMenu>
+      </div>
+
+      <div className="control-group">
+        <button className={deaf ? 'ctl off' : 'ctl'} aria-pressed={deaf} onClick={toggleDeaf} aria-label={deafLabel} data-tooltip={deafLabel}>
+          {deaf ? <HeadphoneOff size={ICON} /> : <Headphones size={ICON} />}
+        </button>
+        <MediaDeviceMenu kind="audiooutput" className="ctl ctl-chevron" aria-label="Escolher saída de som" data-tooltip="Saída de som">
+          <ChevronDown size={14} />
+        </MediaDeviceMenu>
+      </div>
+
+      <div className="control-group">
+        <TrackToggle
+          source={Track.Source.ScreenShare}
+          captureOptions={preset.capture}
+          publishOptions={preset.publish}
+          onChange={setSharing}
+          showIcon={false}
+          className={sharing ? 'ctl on' : 'ctl'}
+          aria-label={shareLabel}
+          data-tooltip={shareLabel}
+        >
+          {sharing ? <MonitorOff size={ICON} /> : <MonitorUp size={ICON} />}
+        </TrackToggle>
+        <PresetMenu value={presetId} onChange={setPresetId} disabled={sharing} />
+      </div>
+
+      <DisconnectButton className="ctl hangup" aria-label="Desconectar" data-tooltip="Desconectar">
+        <PhoneOff size={ICON} />
+      </DisconnectButton>
+    </div>
+  )
+}
+
+// Setinha ao lado de "Transmitir tela": escolhe a qualidade antes de começar
+function PresetMenu({ value, onChange, disabled }: { value: ScreenPresetId; onChange: (id: ScreenPresetId) => void; disabled: boolean }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const outside = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('keydown', key)
+    }
+  }, [open])
+
+  const label = disabled ? 'Qualidade (pare a transmissão para mudar)' : 'Qualidade da transmissão'
+  return (
+    <div className="preset-menu" ref={ref}>
+      <button
+        className="ctl ctl-chevron"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-tooltip={open ? undefined : label}
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+      >
+        <ChevronDown size={14} />
       </button>
-      <MediaDeviceMenu kind="audiooutput" title="Escolher saída de som" />
-      <select
-        className="lk-button"
-        value={presetId}
-        disabled={sharing}
-        title="Qualidade da transmissão"
-        onChange={(e) => setPresetId(e.target.value as ScreenPresetId)}
-      >
-        {Object.entries(SCREEN_PRESETS).map(([id, p]) => (
-          <option key={id} value={id}>{p.label}</option>
-        ))}
-      </select>
-      <TrackToggle
-        source={Track.Source.ScreenShare}
-        captureOptions={preset.capture}
-        publishOptions={preset.publish}
-        onChange={setSharing}
-        showIcon={false}
-      >
-        {sharing ? <><MonitorOff size={ICON} /> Parar transmissão</> : <><MonitorUp size={ICON} /> Transmitir tela</>}
-      </TrackToggle>
-      <DisconnectButton><PhoneOff size={ICON} /> Sair</DisconnectButton>
+      {open && (
+        <div className="user-menu preset-list" role="menu" aria-label="Qualidade da transmissão">
+          <div className="menu-label">Qualidade da transmissão</div>
+          {Object.entries(SCREEN_PRESETS).map(([id, p]) => (
+            <button
+              key={id}
+              role="menuitemradio"
+              aria-checked={id === value}
+              onClick={() => { onChange(id as ScreenPresetId); setOpen(false) }}
+            >
+              {p.label}
+              {id === value && <Check size={16} className="menu-check" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
