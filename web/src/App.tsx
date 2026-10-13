@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { api, session } from './api'
+import { Auth } from './Auth'
 import { Call, type Connection } from './Call'
 
 // ponytail: canais fixos no front; mover para o backend quando houver criação de canais
@@ -20,46 +21,7 @@ export default function App() {
   }, [checking])
 
   if (checking) return null
-  return user ? <Lobby user={user} onLogout={() => setUser(null)} /> : <Login onLogin={setUser} />
-}
-
-function Login({ onLogin }: { onLogin: (name: string) => void }) {
-  const [error, setError] = useState('')
-
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = new FormData(e.currentTarget)
-    const path = (e.nativeEvent as SubmitEvent).submitter?.getAttribute('value') ?? '/login'
-    try {
-      const r = await api<{ name: string; session: string }>(path, {
-        name: form.get('name'),
-        password: form.get('password'),
-      })
-      session.set(r.session)
-      onLogin(r.name)
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
-
-  return (
-    <form className="login" onSubmit={submit}>
-      <h1>Lobby</h1>
-      <label>
-        Nome
-        <input name="name" required minLength={3} maxLength={32} pattern="[a-z0-9_]+" autoComplete="username" />
-      </label>
-      <label>
-        Senha
-        <input name="password" type="password" required minLength={8} autoComplete="current-password" />
-      </label>
-      {error && <p role="alert" className="error">{error}</p>}
-      <div className="row">
-        <button className="lk-button" value="/login">Entrar</button>
-        <button className="lk-button" value="/register">Criar conta</button>
-      </div>
-    </form>
-  )
+  return user ? <Lobby user={user} onLogout={() => setUser(null)} /> : <Auth onLogin={setUser} />
 }
 
 function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {

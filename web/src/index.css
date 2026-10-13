@@ -7,17 +7,64 @@
 body { margin: 0; }
 #root { height: 100vh; }
 
-.login {
-  max-width: 320px;
-  margin: 15vh auto;
+.auth {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 20% 20%, #5865f2aa, transparent 45%),
+    radial-gradient(circle at 80% 80%, #eb459eaa, transparent 45%),
+    #1e1f22;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  padding: 32px;
+  border-radius: 8px;
+  background: #313338;
+  box-shadow: 0 8px 32px #0008;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 18px;
+  animation: auth-in 0.25s ease-out;
 }
-.login label { display: flex; flex-direction: column; gap: 4px; }
-.login input { padding: 8px; border-radius: 6px; border: 1px solid #3f4147; background: #1e1f22; color: inherit; }
-.login .row { display: flex; gap: 8px; }
-.error { color: #f23f43; margin: 0; }
+@keyframes auth-in { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .auth-card { animation: none; } }
+.auth-card header { text-align: center; }
+.auth-card h1 { margin: 0 0 6px; font-size: 24px; color: #f2f3f5; }
+.auth-card header p { margin: 0; color: #b5bac1; }
+.auth-card label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #b5bac1; }
+.auth-card input {
+  padding: 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #1e1f22;
+  color: #dbdee1;
+  font-size: 16px;
+  outline: 2px solid transparent;
+}
+.auth-card input:focus-visible { outline-color: #5865f2; }
+.auth-card small { font-weight: 400; text-transform: none; color: #949ba4; }
+.auth-error { margin: 0; padding: 8px 10px; border-radius: 4px; background: #f23f4326; color: #fa777c; font-size: 14px; }
+.auth-submit {
+  padding: 12px;
+  border: 0;
+  border-radius: 4px;
+  background: #5865f2;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.auth-submit:hover { background: #4752c4; }
+.auth-submit:disabled { opacity: 0.6; cursor: wait; }
+.auth-switch { margin: -6px 0 0; font-size: 14px; color: #949ba4; }
+.auth-switch button { padding: 0; border: 0; background: none; color: #00a8fc; font: inherit; cursor: pointer; }
+.auth-switch button:hover { text-decoration: underline; }
 
 .lobby { display: flex; height: 100%; }
 .lobby nav { width: 220px; background: #1e1f22; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
