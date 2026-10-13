@@ -6,9 +6,14 @@ import {
   useTracks,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
+import {
+  HeadphoneOff, Headphones, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, SlidersHorizontal,
+} from 'lucide-react'
 import { SCREEN_PRESETS, type ScreenPresetId } from './screenShare'
 
 export type Connection = { room: string; url: string; token: string }
+
+const ICON = 18
 
 const DEVICE_ERRORS: Record<MediaDeviceFailure, string> = {
   [MediaDeviceFailure.PermissionDenied]: 'Permissão de microfone negada no navegador.',
@@ -78,7 +83,7 @@ function VoiceTile({ participant }: { participant: Participant }) {
       </div>
       <span className="voice-name">
         {name}
-        {muted && <span title="Microfone desligado"> 🔇</span>}
+        {muted && <MicOff size={14} aria-label="Microfone desligado" />}
       </span>
     </div>
   )
@@ -106,14 +111,16 @@ function Controls({ deaf, setDeaf }: { deaf: boolean; setDeaf: (d: boolean) => v
   return (
     <div className="lk-control-bar">
       <Volumes open={volumesOpen} />
-      <TrackToggle source={Track.Source.Microphone}>Microfone</TrackToggle>
+      <TrackToggle source={Track.Source.Microphone} showIcon={false}>
+        {isMicrophoneEnabled ? <Mic size={ICON} /> : <MicOff size={ICON} />} Microfone
+      </TrackToggle>
       <MediaDeviceMenu kind="audioinput" title="Escolher microfone" />
       <button className="lk-button deaf" aria-pressed={deaf} onClick={toggleDeaf}>
-        {deaf ? '🔈 Voltar a ouvir' : '🎧 Silenciar tudo'}
+        {deaf ? <><HeadphoneOff size={ICON} /> Voltar a ouvir</> : <><Headphones size={ICON} /> Silenciar tudo</>}
       </button>
       <MediaDeviceMenu kind="audiooutput" title="Escolher saída de som" />
       <button className="lk-button" aria-pressed={volumesOpen} onClick={() => setVolumesOpen(!volumesOpen)}>
-        Volumes
+        <SlidersHorizontal size={ICON} /> Volumes
       </button>
       <select
         className="lk-button"
@@ -131,10 +138,11 @@ function Controls({ deaf, setDeaf }: { deaf: boolean; setDeaf: (d: boolean) => v
         captureOptions={preset.capture}
         publishOptions={preset.publish}
         onChange={setSharing}
+        showIcon={false}
       >
-        {sharing ? 'Parar transmissão' : 'Transmitir tela'}
+        {sharing ? <><MonitorOff size={ICON} /> Parar transmissão</> : <><MonitorUp size={ICON} /> Transmitir tela</>}
       </TrackToggle>
-      <DisconnectButton>Sair</DisconnectButton>
+      <DisconnectButton><PhoneOff size={ICON} /> Sair</DisconnectButton>
     </div>
   )
 }

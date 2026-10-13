@@ -73,7 +73,10 @@ body { margin: 0; }
 .lobby nav { width: 220px; background: #1e1f22; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
 .lobby nav h2 { font-size: 12px; text-transform: uppercase; color: #949ba4; }
 .lobby nav footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
-.channel { text-align: left; padding: 6px 8px; border: 0; border-radius: 4px; background: none; color: #949ba4; cursor: pointer; }
+.icon-button { display: grid; place-items: center; padding: 6px; border: 0; border-radius: 4px; background: none; color: #b5bac1; cursor: pointer; }
+.icon-button:hover { background: #35373c; color: #f23f43; }
+.voice-name { display: flex; align-items: center; gap: 4px; }
+.channel { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 6px 8px; border: 0; border-radius: 4px; background: none; color: #949ba4; cursor: pointer; }
 .channel:hover, .channel.active { background: #35373c; color: #fff; }
 .people { list-style: none; margin: 0 0 4px; padding: 0 0 0 28px; font-size: 13px; color: #b5bac1; }
 .people li { padding: 2px 0; display: flex; align-items: center; gap: 4px; }

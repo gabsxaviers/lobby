@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LogOut, MicOff, Volume2 } from 'lucide-react'
 import { api, session } from './api'
 import { Auth } from './Auth'
 import { Call, type Connection } from './Call'
@@ -67,13 +68,13 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
         {CHANNELS.map((c) => (
           <div key={c}>
             <button className={c === conn?.room ? 'channel active' : 'channel'} onClick={() => join(c)}>
-              🔊 {c}
+              <Volume2 size={18} /> {c}
             </button>
             <ul className="people">
               {presence[c]?.map((p) => (
                 <li key={p.name}>
                   {p.name}
-                  {p.muted && <span title="Microfone desligado"> 🔇</span>}
+                  {p.muted && <MicOff size={14} aria-label="Microfone desligado" />}
                   {p.screen && <span className="live">AO VIVO</span>}
                 </li>
               ))}
@@ -82,7 +83,9 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
         ))}
         <footer>
           <span>{user}</span>
-          <button className="lk-button" onClick={logout}>Sair</button>
+          <button className="icon-button" onClick={logout} title="Sair da conta" aria-label="Sair da conta">
+            <LogOut size={18} />
+          </button>
         </footer>
       </nav>
       <main>
