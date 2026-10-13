@@ -77,6 +77,7 @@ export function Auth({ onLogin }: { onLogin: (name: string) => void }) {
       <form className="auth-card" onSubmit={submit} key={mode}>
         <header>
           <img src={logo} alt="Lobby" className="auth-logo" />
+          <p className="tagline">Conecte<span aria-hidden>•</span>Converse<span aria-hidden>•</span>Jogue</p>
           <h1>{t.title}</h1>
           <p>{t.subtitle}</p>
         </header>
