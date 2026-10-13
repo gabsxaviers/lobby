@@ -8,6 +8,8 @@ import {
 import '@livekit/components-styles'
 import { HeadphoneOff, Headphones, Mic, MicOff, MonitorOff, MonitorUp, PhoneOff, VolumeX } from 'lucide-react'
 import { api } from './api'
+import { nameColor } from './avatar'
+import { chatEvents } from './chatEvents'
 import { SCREEN_PRESETS, type ScreenPresetId } from './screenShare'
 import { useUserAudio } from './userAudio'
 import { UserMenu } from './UserMenu'
@@ -53,6 +55,7 @@ export function Call({ conn, channels, onLeave, onMoved, onError }: Props) {
       </LayoutContextProvider>
       <Controls deaf={deaf} setDeaf={setDeaf} />
       <MovedListener onMoved={onMoved} />
+      <ChatListener />
       {/* muted desativa a assinatura do áudio de todos (não baixa nada enquanto surdo) */}
       <RoomAudioRenderer muted={deaf} />
       <StartAudio label="Clique para ativar o áudio" />
@@ -67,6 +70,18 @@ function MovedListener({ onMoved }: { onMoved: (room: string) => void }) {
     try {
       const { to } = JSON.parse(new TextDecoder().decode(msg.payload))
       if (typeof to === 'string') onMoved(to)
+    } catch { /* mensagem malformada: ignora */ }
+  })
+  return null
+}
+
+// Mensagens do chat repassadas pelo servidor (já validadas e salvas) chegam na hora para quem está na chamada
+function ChatListener() {
+  useDataChannel('chat', (msg) => {
+    if (msg.from) return // só o servidor repassa mensagens; ignora qualquer coisa enviada por participantes
+    try {
+      const detail = JSON.parse(new TextDecoder().decode(msg.payload))
+      chatEvents.dispatchEvent(new CustomEvent('message', { detail }))
     } catch { /* mensagem malformada: ignora */ }
   })
   return null
@@ -110,8 +125,6 @@ function VoiceTile({ participant, channels, onError }: TileProps) {
     // ponytail: máximo 100%; acima disso exige webAudioMix no LiveKitRoom
     if (participant instanceof RemoteParticipant) participant.setVolume(audio.muted ? 0 : audio.volume / 100)
   }, [participant, audio])
-  // Cor fixa por nome, para cada pessoa ser reconhecível
-  const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0)
 
   function openMenu(e: MouseEvent) {
     if (!remote) return // ponytail: sem menu no próprio card; adicionar "mover a si mesmo" se pedirem
@@ -125,7 +138,7 @@ function VoiceTile({ participant, channels, onError }: TileProps) {
 
   return (
     <div className={speaking ? 'voice-tile speaking' : 'voice-tile'} onContextMenu={openMenu}>
-      <div className="avatar" style={{ background: `hsl(${hue} 55% 45%)` }} aria-hidden>
+      <div className="avatar" style={{ background: nameColor(name) }} aria-hidden>
         {name[0].toUpperCase()}
       </div>
       <span className="voice-name">

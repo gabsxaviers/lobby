@@ -52,6 +52,22 @@ test('cadastro, login e token do LiveKit', async (t) => {
   assert.equal((await post('/move', { room: 'geral', identity: 'alguem', to: 'jogos' }, session)).status, 403)
   assert.equal((await post('/move', { room: 'geral', identity: 'alguem', to: 'geral' }, session)).status, 400)
 
+  // Chat do canal: envia, lê o histórico e busca só as novas com "after"
+  const get = (path: string) => fetch(base + path, { headers: { authorization: `Bearer ${session}` } })
+  assert.equal((await fetch(base + '/channels/geral/messages')).status, 401)
+  assert.equal((await post('/channels/inexistente/messages', { body: 'oi' }, session)).status, 404)
+  assert.equal((await post('/channels/geral/messages', { body: '   ' }, session)).status, 400)
+  assert.equal((await post('/channels/geral/messages', { body: 'x'.repeat(2001) }, session)).status, 400)
+  const sent = await (await post('/channels/geral/messages', { body: `  olá ${id}  ` }, session)).json()
+  assert.equal(sent.body, `olá ${id}`)
+  assert.equal(sent.author, creds.name)
+  const history = await (await get('/channels/geral/messages')).json()
+  assert.equal(history.at(-1).id, sent.id)
+  const second = await (await post('/channels/geral/messages', { body: 'segunda' }, session)).json()
+  const newer = await (await get(`/channels/geral/messages?after=${sent.id}`)).json()
+  assert.deepEqual(newer.map((m: { id: string }) => m.id), [second.id])
+  assert.equal((await get('/channels/geral/messages?after=abc')).status, 400)
+
   assert.equal((await post('/logout', {}, session)).status, 200)
   assert.equal((await post('/livekit-token', { room: 'geral' }, session)).status, 401)
 })

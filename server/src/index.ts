@@ -19,7 +19,9 @@ const roomService = new RoomServiceClient(LIVEKIT_HOST, LIVEKIT_KEY, LIVEKIT_SEC
 const WEB_ORIGINS = new Set(env('WEB_ORIGINS', 'http://localhost:5173').split(','))
 
 const NAME_RE = /^[a-z0-9_]{3,32}$/
-const ROOM_RE = /^[a-z0-9-]{1,32}$/
+// ponytail: lista fixa, igual à do front (web/src/App.tsx); virar tabela quando houver criação de canais
+const CHANNELS = new Set(['geral', 'jogos', 'estudo'])
+const isChannel = (c: unknown): c is string => typeof c === 'string' && CHANNELS.has(c)
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Postgres local (docker-compose) ou Neon em produção; só muda a DATABASE_URL
@@ -37,6 +39,18 @@ await sql`
 // E-mail opcional no banco: contas criadas antes dele continuam válidas. Único quando presente.
 await sql`alter table users add column if not exists email text`
 await sql`create unique index if not exists users_email_key on users (email)`
+await sql`
+  create table if not exists messages (
+    id bigserial primary key,
+    channel text not null,
+    author text not null references users(name) on delete cascade,
+    body text not null,
+    created timestamptz not null default now()
+  )
+`
+await sql`create index if not exists messages_channel_id on messages (channel, id)`
+
+type Message = { id: string; channel: string; author: string; body: string; created: Date }
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: string, len: number) => Promise<Buffer>
 
@@ -190,8 +204,7 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
   // ponytail: qualquer um no mesmo canal pode mover; restringir por cargo quando houver permissões
   if (path === 'POST /move') {
     const { room, identity, to } = await readJson(req)
-    const validRoom = (r: unknown): r is string => typeof r === 'string' && ROOM_RE.test(r)
-    if (!validRoom(room) || !validRoom(to) || room === to) throw new HttpError(400, 'Canal inválido')
+    if (!isChannel(room) || !isChannel(to) || room === to) throw new HttpError(400, 'Canal inválido')
     if (!validName(identity)) throw new HttpError(400, 'Usuário inválido')
     // Sala vazia ou inexistente: o LiveKit responde erro, tratamos como ninguém lá
     const present = new Set((await roomService.listParticipants(room).catch(() => [])).map((p) => p.identity))
@@ -203,6 +216,39 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
     return [200, {}]
   }
 
+  // Chat de texto de cada canal: histórico no Postgres
+  const chat = path.match(/^(GET|POST) \/channels\/([^/]+)\/messages$/)
+  if (chat) {
+    const channel = chat[2]
+    if (!isChannel(channel)) throw new HttpError(404, 'Canal não encontrado')
+
+    if (chat[1] === 'GET') {
+      // Sem "after": as 50 últimas. Com "after": só as novas (usado na atualização periódica)
+      const after = url.searchParams.get('after')
+      if (after !== null && !/^\d{1,18}$/.test(after)) throw new HttpError(400, 'Parâmetro after inválido')
+      const rows = after === null
+        ? await sql<Message[]>`
+            select * from (select * from messages where channel = ${channel} order by id desc limit 50) m order by id
+          `
+        : await sql<Message[]>`
+            select * from messages where channel = ${channel} and id > ${after} order by id limit 100
+          `
+      return [200, rows]
+    }
+
+    if (rateLimited(`msg:${name}`, 30)) throw new HttpError(429, 'Muitas mensagens, aguarde um pouco')
+    const { body } = await readJson(req)
+    const text = typeof body === 'string' ? body.trim() : ''
+    if (!text || text.length > 2000) throw new HttpError(400, 'A mensagem deve ter de 1 a 2000 caracteres')
+    const [message] = await sql<Message[]>`
+      insert into messages (channel, author, body) values (${channel}, ${name}, ${text}) returning *
+    `
+    // Tempo real para quem está na chamada do canal; sem ninguém lá a sala não existe e tudo bem
+    const payload = new TextEncoder().encode(JSON.stringify(message))
+    await roomService.sendData(channel, payload, DataPacket_Kind.RELIABLE, { topic: 'chat' }).catch(() => {})
+    return [200, message]
+  }
+
   if (path === 'POST /logout') {
     await sql`delete from sessions where token = ${bearer(req)!}`
     return [200, {}]
@@ -210,7 +256,7 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
 
   if (path === 'POST /livekit-token') {
     const { room } = await readJson(req)
-    if (typeof room !== 'string' || !ROOM_RE.test(room)) throw new HttpError(400, 'Sala inválida')
+    if (!isChannel(room)) throw new HttpError(400, 'Canal inválido')
     const at = new AccessToken(LIVEKIT_KEY, LIVEKIT_SECRET, { identity: name, ttl: '6h' })
     at.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true })
     return [200, { url: LIVEKIT_URL, token: await at.toJwt() }]

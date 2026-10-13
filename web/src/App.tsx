@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
-import { LogOut, MicOff, Volume2 } from 'lucide-react'
+import { LogOut, MessageSquare, MicOff, Volume2 } from 'lucide-react'
 import { api, session } from './api'
 import { Auth } from './Auth'
+import { Chat } from './Chat'
 import logo from './assets/logo.png'
 import { Call, type Connection } from './Call'
 import { UserMenu } from './UserMenu'
@@ -32,6 +33,8 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
   const [presence, setPresence] = useState<Record<string, Person[]>>({})
   const [menu, setMenu] = useState<{ x: number; y: number; name: string; channel: string } | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
+  // Chat aberto: segue o canal de voz ao entrar, mas dá para abrir o de outro canal sem entrar na voz
+  const [chatChannel, setChatChannel] = useState<string | null>(null)
 
   useEffect(() => {
     const load = () => api<Record<string, Person[]>>('/presence').then(setPresence).catch(() => {})
@@ -49,6 +52,7 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
   }, [toast])
 
   async function join(room: string) {
+    setChatChannel(room)
     if (conn?.room === room) return
     setConn(null) // desmonta a sala atual (desconecta) antes de entrar na próxima
     try {
@@ -83,9 +87,20 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
         <h2>Canais de voz</h2>
         {CHANNELS.map((c) => (
           <div key={c}>
-            <button className={c === conn?.room ? 'channel active' : 'channel'} onClick={() => join(c)}>
-              <Volume2 size={18} /> {c}
-            </button>
+            <div className="channel-row">
+              <button className={c === conn?.room ? 'channel active' : 'channel'} onClick={() => join(c)}>
+                <Volume2 size={18} /> {c}
+              </button>
+              <button
+                className={c === chatChannel ? 'icon-button chat-toggle open' : 'icon-button chat-toggle'}
+                onClick={() => setChatChannel(c === chatChannel ? null : c)}
+                title={`Chat de ${c}`}
+                aria-label={`Abrir chat de ${c}`}
+                aria-pressed={c === chatChannel}
+              >
+                <MessageSquare size={16} />
+              </button>
+            </div>
             <ul className="people">
               {presence[c]?.map((p) => (
                 <li key={p.name} onContextMenu={(e) => openMenu(e, p.name, c)}>
@@ -118,6 +133,14 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
           <p className="empty">Escolha um canal para entrar.</p>
         )}
       </main>
+      {chatChannel && (
+        <Chat
+          key={chatChannel}
+          channel={chatChannel}
+          live={chatChannel === conn?.room}
+          onClose={() => setChatChannel(null)}
+        />
+      )}
       {menu && (
         <UserMenu
           {...menu}
