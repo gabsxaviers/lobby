@@ -73,6 +73,9 @@ body { margin: 0; }
 .lobby nav { width: 220px; background: #1e1f22; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
 .lobby nav h2 { font-size: 12px; text-transform: uppercase; color: #949ba4; }
 .lobby nav footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+/* Interface não é texto para selecionar (como no Discord); campos de formulário continuam editáveis */
+.lobby nav, .call .stage, .lk-control-bar { user-select: none; }
+
 .icon-button { display: grid; place-items: center; padding: 6px; border: 0; border-radius: 4px; background: none; color: #b5bac1; cursor: pointer; }
 .icon-button:hover { background: #35373c; color: #f23f43; }
 .voice-name { display: flex; align-items: center; gap: 4px; }
