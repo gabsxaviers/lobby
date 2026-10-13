@@ -4,13 +4,13 @@ Chamadas em grupo com voz e transmissão de tela. React + Vite no front, LiveKit
 
 ```
 web/      React + TS + Vite (livekit-client, @livekit/components-react)
-server/   Node 24 + TS sem build: cadastro/login (SQLite nativo) e token do LiveKit
+server/   Node 24 + TS sem build: cadastro/login (Postgres) e token do LiveKit
 docker-compose.yml   LiveKit em modo dev
 ```
 
 ## Rodar em desenvolvimento
 
-Com o Docker Desktop aberto, tudo sobe junto (grupo `lobby`: `lobby_livekit`, `lobby_api`, `lobby_web`):
+Com o Docker Desktop aberto, tudo sobe junto (grupo `lobby`: `lobby_livekit`, `lobby_db`, `lobby_api`, `lobby_web`). O Postgres fica na porta **5433** do host:
 
 ```bash
 docker compose up -d
@@ -24,7 +24,7 @@ Teste da API: `cd server && npm test`.
 
 ## Configuração
 
-- `server/.env` (copie de `.env.example`): porta, origens permitidas (CORS), caminho do banco, URL e chaves do LiveKit.
+- `server/.env` (copie de `.env.example`): porta, origens permitidas (CORS), `DATABASE_URL`, URL e chaves do LiveKit.
 - `web/.env`: `VITE_API_URL` (padrão `http://localhost:3001`).
 
 ## API

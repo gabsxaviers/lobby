@@ -12,7 +12,8 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "livekit-server-sdk": "^2.19.1"
+    "livekit-server-sdk": "^2.19.1",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

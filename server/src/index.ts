@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { DatabaseSync } from 'node:sqlite'
+import postgres from 'postgres'
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
 import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk'
@@ -17,20 +17,22 @@ const LIVEKIT_SECRET = env('LIVEKIT_API_SECRET', 'secret')
 const LIVEKIT_HOST = env('LIVEKIT_HOST', LIVEKIT_URL.replace(/^ws/, 'http'))
 const roomService = new RoomServiceClient(LIVEKIT_HOST, LIVEKIT_KEY, LIVEKIT_SECRET)
 const WEB_ORIGINS = new Set(env('WEB_ORIGINS', 'http://localhost:5173').split(','))
-const SESSION_MS = 30 * 24 * 3600_000
 
 const NAME_RE = /^[a-z0-9_]{3,32}$/
 const ROOM_RE = /^[a-z0-9-]{1,32}$/
 
-const db = new DatabaseSync(env('DB_PATH', 'lobby.db'))
-db.exec(`
-  create table if not exists users (name text primary key, hash text not null);
+// Postgres local (docker-compose) ou Neon em produção; só muda a DATABASE_URL
+export const sql = postgres(env('DATABASE_URL', 'postgres://lobby:lobby@localhost:5433/lobby'), { onnotice: () => {} })
+await sql`
+  create table if not exists users (name text primary key, hash text not null)
+`
+await sql`
   create table if not exists sessions (
     token text primary key,
-    name text not null references users(name),
-    created integer not null
-  );
-`)
+    name text not null references users(name) on delete cascade,
+    created timestamptz not null default now()
+  )
+`
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: string, len: number) => Promise<Buffer>
 
@@ -44,17 +46,22 @@ async function checkPassword(pw: string, stored: string) {
   return timingSafeEqual(await scryptAsync(pw, salt, 64), Buffer.from(hex, 'hex'))
 }
 
-function newSession(name: string) {
+async function newSession(name: string) {
   const token = randomBytes(32).toString('base64url')
-  db.prepare('insert into sessions values (?, ?, ?)').run(token, name, Date.now())
+  await sql`insert into sessions (token, name) values (${token}, ${name})`
   return token
 }
 
-function sessionUser(req: IncomingMessage): string | null {
-  const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
+function bearer(req: IncomingMessage) {
+  return req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]
+}
+
+async function sessionUser(req: IncomingMessage): Promise<string | null> {
+  const token = bearer(req)
   if (!token) return null
-  const row = db.prepare('select name from sessions where token = ? and created > ?')
-    .get(token, Date.now() - SESSION_MS) as { name: string } | undefined
+  const [row] = await sql<{ name: string }[]>`
+    select name from sessions where token = ${token} and created > now() - interval '30 days'
+  `
   return row?.name ?? null
 }
 
@@ -100,18 +107,21 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
   if (path === 'POST /register' || path === 'POST /login') {
     if (rateLimited(req.socket.remoteAddress ?? '')) throw new HttpError(429, 'Muitas tentativas, aguarde 1 minuto')
     const { name, password } = credentials(await readJson(req))
-    const user = db.prepare('select hash from users where name = ?').get(name) as { hash: string } | undefined
-
     if (path === 'POST /register') {
-      if (user) throw new HttpError(409, 'Nome já em uso')
-      db.prepare('insert into users values (?, ?)').run(name, await hashPassword(password))
-    } else if (!user || !(await checkPassword(password, user.hash))) {
-      throw new HttpError(401, 'Nome ou senha incorretos')
+      // on conflict evita corrida entre dois cadastros simultâneos com o mesmo nome
+      const created = await sql`
+        insert into users (name, hash) values (${name}, ${await hashPassword(password)})
+        on conflict do nothing returning name
+      `
+      if (created.length === 0) throw new HttpError(409, 'Nome já em uso')
+    } else {
+      const [user] = await sql<{ hash: string }[]>`select hash from users where name = ${name}`
+      if (!user || !(await checkPassword(password, user.hash))) throw new HttpError(401, 'Nome ou senha incorretos')
     }
-    return [200, { name, session: newSession(name) }]
+    return [200, { name, session: await newSession(name) }]
   }
 
-  const name = sessionUser(req)
+  const name = await sessionUser(req)
   if (!name) throw new HttpError(401, 'Não autenticado')
 
   if (path === 'GET /me') return [200, { name }]
@@ -134,7 +144,7 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
   }
 
   if (path === 'POST /logout') {
-    db.prepare('delete from sessions where token = ?').run(req.headers.authorization!.slice(7))
+    await sql`delete from sessions where token = ${bearer(req)!}`
     return [200, {}]
   }
 

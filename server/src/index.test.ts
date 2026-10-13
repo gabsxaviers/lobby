@@ -2,12 +2,12 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 
-process.env.DB_PATH = ':memory:'
-const { server } = await import('./index.ts')
+// Usa o Postgres do docker-compose (ou DATABASE_URL); nome aleatório evita colisão entre execuções
+const { server, sql } = await import('./index.ts')
 
 test('cadastro, login e token do LiveKit', async (t) => {
   await new Promise<void>((r) => server.listen(0, r))
-  t.after(() => server.close())
+  t.after(() => { server.close(); return sql.end() })
   const base = `http://localhost:${(server.address() as AddressInfo).port}`
   const post = (path: string, body: object, session?: string) =>
     fetch(base + path, {
@@ -16,7 +16,7 @@ test('cadastro, login e token do LiveKit', async (t) => {
       body: JSON.stringify(body),
     })
 
-  const creds = { name: 'ana', password: 'senha-segura' }
+  const creds = { name: `teste_${Date.now()}`, password: 'senha-segura' }
   assert.equal((await post('/register', creds)).status, 200)
   assert.equal((await post('/register', creds)).status, 409)
   assert.equal((await post('/register', { name: 'A!', password: 'x' })).status, 400)
@@ -31,7 +31,7 @@ test('cadastro, login e token do LiveKit', async (t) => {
   assert.equal(res.status, 200)
   const { token } = await res.json()
   const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString())
-  assert.equal(claims.sub, 'ana')
+  assert.equal(claims.sub, creds.name)
   assert.equal(claims.video.room, 'geral')
   assert.equal(claims.video.roomJoin, true)
 

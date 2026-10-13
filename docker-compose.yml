@@ -12,6 +12,22 @@ services:
       - "7881:7881"     # WebRTC via TCP (fallback)
       - "7882:7882/udp" # WebRTC via UDP (mídia)
 
+  db:
+    container_name: lobby_db
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: lobby
+      POSTGRES_PASSWORD: lobby
+      POSTGRES_DB: lobby
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # 5433 no host para não colidir com outros Postgres na 5432
+    healthcheck:
+      test: pg_isready -U lobby
+      interval: 2s
+      retries: 15
+
   api:
     container_name: lobby_api
     image: node:24-alpine
@@ -20,7 +36,7 @@ services:
     environment:
       PORT: 3001
       WEB_ORIGINS: http://localhost:5173
-      DB_PATH: /data/lobby.db
+      DATABASE_URL: postgres://lobby:lobby@db:5432/lobby
       LIVEKIT_URL: ws://localhost:7880 # endereço visto pelo navegador
       LIVEKIT_HOST: http://livekit:7880 # endereço visto pela API (rede do Docker)
       LIVEKIT_API_KEY: devkey
@@ -28,9 +44,11 @@ services:
     volumes:
       - ./server:/app
       - /app/node_modules # node_modules do Linux, separado do Windows
-      - db:/data
     ports:
       - "3001:3001"
+    depends_on:
+      db:
+        condition: service_healthy
 
   web:
     container_name: lobby_web
@@ -45,4 +63,4 @@ services:
     depends_on: [api, livekit]
 
 volumes:
-  db:
+  pgdata:
