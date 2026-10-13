@@ -74,6 +74,13 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
     return () => clearInterval(id)
   }, [conn?.room]) // recarrega na hora ao entrar/sair de um canal
 
+  const [toast, setToast] = useState('')
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(''), 5000)
+    return () => clearTimeout(id)
+  }, [toast])
+
   async function join(room: string) {
     if (conn?.room === room) return
     setConn(null) // desmonta a sala atual (desconecta) antes de entrar na próxima
@@ -81,7 +88,7 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
       const r = await api<{ url: string; token: string }>('/livekit-token', { room })
       setConn({ room, ...r })
     } catch (err) {
-      alert((err as Error).message)
+      setToast((err as Error).message)
     }
   }
 
@@ -118,11 +125,12 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
       </nav>
       <main>
         {conn ? (
-          <Call key={conn.room} conn={conn} onLeave={() => setConn(null)} />
+          <Call key={conn.room} conn={conn} onLeave={() => setConn(null)} onError={setToast} />
         ) : (
           <p className="empty">Escolha um canal para entrar.</p>
         )}
       </main>
+      {toast && <div role="alert" className="toast" onClick={() => setToast('')}>{toast}</div>}
     </div>
   )
 }

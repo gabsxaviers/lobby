@@ -32,4 +32,12 @@ body { margin: 0; }
 .empty { text-align: center; margin-top: 30vh; color: #949ba4; }
 
 .call { display: flex; flex-direction: column; height: 100%; }
+.call .lk-control-bar { position: relative; flex-wrap: wrap; }
+.volumes { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; min-width: 280px; padding: 12px; background: #2b2d31; border-radius: 8px; box-shadow: 0 4px 16px #0008; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+.volumes[hidden] { display: none; }
+.volumes p { margin: 0; color: #949ba4; }
+.volumes label { display: grid; grid-template-columns: 1fr 120px 40px; align-items: center; gap: 8px; font-size: 14px; }
+.lk-button.deaf[aria-pressed='true'] { background: #f23f43; }
+
+.toast { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); background: #f23f43; color: #fff; padding: 10px 16px; border-radius: 6px; box-shadow: 0 4px 16px #0008; cursor: pointer; z-index: 20; }
 .call .stage { flex: 1; min-height: 0; }
