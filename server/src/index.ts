@@ -20,6 +20,7 @@ const WEB_ORIGINS = new Set(env('WEB_ORIGINS', 'http://localhost:5173').split(',
 
 const NAME_RE = /^[a-z0-9_]{3,32}$/
 const ROOM_RE = /^[a-z0-9-]{1,32}$/
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Postgres local (docker-compose) ou Neon em produção; só muda a DATABASE_URL
 export const sql = postgres(env('DATABASE_URL', 'postgres://lobby:lobby@localhost:5433/lobby'), { onnotice: () => {} })
@@ -33,6 +34,9 @@ await sql`
     created timestamptz not null default now()
   )
 `
+// E-mail opcional no banco: contas criadas antes dele continuam válidas. Único quando presente.
+await sql`alter table users add column if not exists email text`
+await sql`create unique index if not exists users_email_key on users (email)`
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: string, len: number) => Promise<Buffer>
 
@@ -67,11 +71,16 @@ async function sessionUser(req: IncomingMessage): Promise<string | null> {
 
 // ponytail: limite em memória por IP, só vale para um processo; usar Redis se escalar horizontalmente
 const attempts = new Map<string, { count: number; reset: number }>()
-function rateLimited(ip: string) {
+function rateLimited(key: string, maxPerMinute: number) {
   const now = Date.now()
-  const a = attempts.get(ip)
-  if (!a || a.reset < now) { attempts.set(ip, { count: 1, reset: now + 60_000 }); return false }
-  return ++a.count > 10
+  const a = attempts.get(key)
+  if (!a || a.reset < now) { attempts.set(key, { count: 1, reset: now + 60_000 }); return false }
+  return ++a.count > maxPerMinute
+}
+
+// Na Vercel o socket é o proxy; o IP real vem no x-forwarded-for (preenchido pela própria Vercel)
+function clientIp(req: IncomingMessage) {
+  return (process.env.VERCEL ? String(req.headers['x-forwarded-for']).split(',')[0] : req.socket.remoteAddress) ?? ''
 }
 
 class HttpError extends Error {
@@ -99,33 +108,60 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
   return body as Record<string, unknown>
 }
 
-function credentials(body: Record<string, unknown>) {
-  const { name, password } = body
-  if (typeof name !== 'string' || !NAME_RE.test(name)) throw new HttpError(400, 'Nome: 3-32 caracteres a-z, 0-9, _')
+function validName(name: unknown): name is string {
+  return typeof name === 'string' && NAME_RE.test(name)
+}
+
+function password(body: Record<string, unknown>) {
+  const { password } = body
   if (typeof password !== 'string' || password.length < 8 || password.length > 200) throw new HttpError(400, 'Senha: 8-200 caracteres')
-  return { name, password }
+  return password
 }
 
 async function route(req: IncomingMessage): Promise<[number, object]> {
-  const path = `${req.method} ${new URL(req.url ?? '/', 'http://x').pathname}`
+  const url = new URL(req.url ?? '/', 'http://x')
+  const path = `${req.method} ${url.pathname}`
 
-  if (path === 'POST /register' || path === 'POST /login') {
-    // Na Vercel o socket é o proxy; o IP real vem no x-forwarded-for (preenchido pela própria Vercel)
-    const ip = process.env.VERCEL ? String(req.headers['x-forwarded-for']).split(',')[0] : req.socket.remoteAddress
-    if (rateLimited(ip ?? '')) throw new HttpError(429, 'Muitas tentativas, aguarde 1 minuto')
-    const { name, password } = credentials(await readJson(req))
-    if (path === 'POST /register') {
-      // on conflict evita corrida entre dois cadastros simultâneos com o mesmo nome
-      const created = await sql`
-        insert into users (name, hash) values (${name}, ${await hashPassword(password)})
-        on conflict do nothing returning name
-      `
-      if (created.length === 0) throw new HttpError(409, 'Nome já em uso')
-    } else {
-      const [user] = await sql<{ hash: string }[]>`select hash from users where name = ${name}`
-      if (!user || !(await checkPassword(password, user.hash))) throw new HttpError(401, 'Nome ou senha incorretos')
+  if (path === 'GET /check-name') {
+    // Folga maior que no login: é chamado enquanto a pessoa digita
+    if (rateLimited(`check:${clientIp(req)}`, 60)) throw new HttpError(429, 'Muitas consultas, aguarde 1 minuto')
+    const name = url.searchParams.get('name')
+    if (!validName(name)) throw new HttpError(400, 'Nome: 3-32 caracteres a-z, 0-9, _')
+    const [taken] = await sql`select 1 from users where name = ${name}`
+    return [200, { available: !taken }]
+  }
+
+  if (path === 'POST /register') {
+    if (rateLimited(`auth:${clientIp(req)}`, 10)) throw new HttpError(429, 'Muitas tentativas, aguarde 1 minuto')
+    const body = await readJson(req)
+    const { name } = body
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    if (!validName(name)) throw new HttpError(400, 'Nome: 3-32 caracteres a-z, 0-9, _')
+    if (email.length > 254 || !EMAIL_RE.test(email)) throw new HttpError(400, 'E-mail inválido')
+    const hash = await hashPassword(password(body))
+    try {
+      await sql`insert into users (name, email, hash) values (${name}, ${email}, ${hash})`
+    } catch (e) {
+      // As restrições do banco resolvem corridas entre cadastros simultâneos
+      if (e instanceof postgres.PostgresError && e.code === '23505') {
+        throw new HttpError(409, e.constraint_name === 'users_email_key' ? 'E-mail já cadastrado' : 'Nome já em uso')
+      }
+      throw e
     }
     return [200, { name, session: await newSession(name) }]
+  }
+
+  if (path === 'POST /login') {
+    if (rateLimited(`auth:${clientIp(req)}`, 10)) throw new HttpError(429, 'Muitas tentativas, aguarde 1 minuto')
+    const body = await readJson(req)
+    const login = typeof body.login === 'string' ? body.login.trim().toLowerCase() : ''
+    const pw = password(body)
+    // Aceita nome de usuário ou e-mail (os dois são guardados em minúsculas)
+    const [user] = await sql<{ name: string; hash: string }[]>`
+      select name, hash from users where name = ${login} or email = ${login}
+    `
+    if (!user || !(await checkPassword(pw, user.hash))) throw new HttpError(401, 'Login ou senha incorretos')
+    return [200, { name: user.name, session: await newSession(user.name) }]
   }
 
   const name = await sessionUser(req)

@@ -31,8 +31,9 @@ Teste da API: `cd server && npm test`.
 
 | Rota | Auth | Corpo | Resposta |
 |---|---|---|---|
-| `POST /register` | — | `{name, password}` | `{name, session}` |
-| `POST /login` | — | `{name, password}` | `{name, session}` |
+| `GET /check-name?name=` | — | — | `{available}` |
+| `POST /register` | — | `{name, email, password}` | `{name, session}` |
+| `POST /login` | — | `{login, password}` (e-mail ou nome) | `{name, session}` |
 | `GET /me` | Bearer | — | `{name}` |
 | `GET /presence` | Bearer | — | `{[sala]: [{name, muted, screen}]}` |
 | `POST /logout` | Bearer | — | `{}` |

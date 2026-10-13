@@ -48,6 +48,9 @@ body { margin: 0; }
 }
 .auth-card input:focus-visible { outline-color: #5865f2; }
 .auth-card small { font-weight: 400; text-transform: none; color: #949ba4; }
+.auth-card small.name-available { color: #23a55a; }
+.auth-card small.name-taken { color: #fa777c; }
+.auth-card input[aria-invalid='true'] { outline-color: #f23f43; }
 .auth-error { margin: 0; padding: 8px 10px; border-radius: 4px; background: #f23f4326; color: #fa777c; font-size: 14px; }
 .auth-submit {
   padding: 12px;
