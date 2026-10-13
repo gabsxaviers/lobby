@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { MediaDeviceFailure, Track, type RemoteParticipant } from 'livekit-client'
+import { MediaDeviceFailure, Track, type Participant, type RemoteParticipant } from 'livekit-client'
 import {
-  CarouselLayout, DisconnectButton, FocusLayout, FocusLayoutContainer, GridLayout, LayoutContextProvider,
-  LiveKitRoom, MediaDeviceMenu, ParticipantTile, RoomAudioRenderer, StartAudio, TrackToggle, isTrackReference,
-  useLocalParticipant, useRemoteParticipants, useTracks,
+  DisconnectButton, LayoutContextProvider, LiveKitRoom, MediaDeviceMenu, ParticipantTile, RoomAudioRenderer,
+  StartAudio, TrackToggle, useIsMuted, useIsSpeaking, useLocalParticipant, useParticipants, useRemoteParticipants,
+  useTracks,
 } from '@livekit/components-react'
 import '@livekit/components-styles'
 import { SCREEN_PRESETS, type ScreenPresetId } from './screenShare'
@@ -47,30 +47,40 @@ export function Call({ conn, onLeave, onError }: Props) {
   )
 }
 
+// Como no Discord: cards de voz pequenos e centralizados; com transmissão, a tela em destaque e os cards numa faixa
 function Stage() {
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: true }, // um bloco por participante (sem câmera = avatar)
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ],
-    { onlySubscribed: false },
-  )
-  const screen = tracks.find((t) => isTrackReference(t) && t.source === Track.Source.ScreenShare)
+  const participants = useParticipants()
+  // ponytail: mostra só a primeira transmissão; com várias, adicionar seleção de qual assistir
+  const [screen] = useTracks([Track.Source.ScreenShare], { onlySubscribed: false })
+  // Enquanto conecta, o participante local ainda não tem identidade: não mostra card vazio
+  const tiles = participants.filter((p) => p.identity).map((p) => <VoiceTile key={p.identity} participant={p} />)
 
-  if (!screen) {
-    return (
-      <GridLayout tracks={tracks} className="stage">
-        <ParticipantTile />
-      </GridLayout>
-    )
-  }
+  if (!screen) return <div className="stage voice-grid">{tiles}</div>
   return (
-    <FocusLayoutContainer className="stage">
-      <CarouselLayout tracks={tracks.filter((t) => t !== screen)}>
-        <ParticipantTile />
-      </CarouselLayout>
-      <FocusLayout trackRef={screen} />
-    </FocusLayoutContainer>
+    <div className="stage with-screen">
+      <ParticipantTile trackRef={screen} className="screen" />
+      <div className="voice-strip">{tiles}</div>
+    </div>
+  )
+}
+
+function VoiceTile({ participant }: { participant: Participant }) {
+  const speaking = useIsSpeaking(participant)
+  const muted = useIsMuted({ participant, source: Track.Source.Microphone })
+  const name = participant.identity
+  // Cor fixa por nome, para cada pessoa ser reconhecível
+  const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0)
+
+  return (
+    <div className={speaking ? 'voice-tile speaking' : 'voice-tile'}>
+      <div className="avatar" style={{ background: `hsl(${hue} 55% 45%)` }} aria-hidden>
+        {name[0].toUpperCase()}
+      </div>
+      <span className="voice-name">
+        {name}
+        {muted && <span title="Microfone desligado"> 🔇</span>}
+      </span>
+    </div>
   )
 }
 
