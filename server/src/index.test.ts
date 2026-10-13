@@ -24,6 +24,7 @@ test('cadastro, login e token do LiveKit', async (t) => {
 
   const { session } = await (await post('/login', creds)).json()
   assert.equal((await post('/livekit-token', { room: 'geral' })).status, 401)
+  assert.equal((await fetch(base + '/presence')).status, 401)
   assert.equal((await post('/livekit-token', { room: '../x' }, session)).status, 400)
 
   const res = await post('/livekit-token', { room: 'geral' }, session)

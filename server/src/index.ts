@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { DatabaseSync } from 'node:sqlite'
 import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
 import { promisify } from 'node:util'
-import { AccessToken } from 'livekit-server-sdk'
+import { AccessToken, RoomServiceClient, TrackSource } from 'livekit-server-sdk'
 
 function env(key: string, fallback?: string): string {
   const v = process.env[key] ?? fallback
@@ -13,6 +13,9 @@ function env(key: string, fallback?: string): string {
 const LIVEKIT_URL = env('LIVEKIT_URL', 'ws://localhost:7880')
 const LIVEKIT_KEY = env('LIVEKIT_API_KEY', 'devkey')
 const LIVEKIT_SECRET = env('LIVEKIT_API_SECRET', 'secret')
+// Endereço do LiveKit visto pela API (no Docker é http://livekit:7880, não localhost)
+const LIVEKIT_HOST = env('LIVEKIT_HOST', LIVEKIT_URL.replace(/^ws/, 'http'))
+const roomService = new RoomServiceClient(LIVEKIT_HOST, LIVEKIT_KEY, LIVEKIT_SECRET)
 const WEB_ORIGINS = new Set(env('WEB_ORIGINS', 'http://localhost:5173').split(','))
 const SESSION_MS = 30 * 24 * 3600_000
 
@@ -112,6 +115,23 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
   if (!name) throw new HttpError(401, 'Não autenticado')
 
   if (path === 'GET /me') return [200, { name }]
+
+  // { geral: [{ name, muted, screen }], ... } só com salas que têm alguém
+  if (path === 'GET /presence') {
+    const rooms = await roomService.listRooms()
+    const entries = await Promise.all(rooms.map(async (r) => {
+      const people = (await roomService.listParticipants(r.name)).map((p) => {
+        const mic = p.tracks.find((t) => t.source === TrackSource.MICROPHONE)
+        return {
+          name: p.identity,
+          muted: !mic || mic.muted,
+          screen: p.tracks.some((t) => t.source === TrackSource.SCREEN_SHARE),
+        }
+      })
+      return [r.name, people] as const
+    }))
+    return [200, Object.fromEntries(entries.filter(([, people]) => people.length > 0))]
+  }
 
   if (path === 'POST /logout') {
     db.prepare('delete from sessions where token = ?').run(req.headers.authorization!.slice(7))

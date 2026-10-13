@@ -34,6 +34,7 @@ Teste da API: `cd server && npm test`.
 | `POST /register` | — | `{name, password}` | `{name, session}` |
 | `POST /login` | — | `{name, password}` | `{name, session}` |
 | `GET /me` | Bearer | — | `{name}` |
+| `GET /presence` | Bearer | — | `{[sala]: [{name, muted, screen}]}` |
 | `POST /logout` | Bearer | — | `{}` |
 | `POST /livekit-token` | Bearer | `{room}` | `{url, token}` |
 

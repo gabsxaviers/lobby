@@ -22,6 +22,7 @@ services:
       WEB_ORIGINS: http://localhost:5173
       DB_PATH: /data/lobby.db
       LIVEKIT_URL: ws://localhost:7880 # endereço visto pelo navegador
+      LIVEKIT_HOST: http://livekit:7880 # endereço visto pela API (rede do Docker)
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: secret
     volumes:

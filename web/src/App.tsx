@@ -5,6 +5,8 @@ import { Call, type Connection } from './Call'
 // ponytail: canais fixos no front; mover para o backend quando houver criação de canais
 const CHANNELS = ['geral', 'jogos', 'estudo']
 
+type Person = { name: string; muted: boolean; screen: boolean }
+
 export default function App() {
   const [user, setUser] = useState<string | null>(null)
   const [checking, setChecking] = useState(() => session.get() !== null)
@@ -62,6 +64,15 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
 
 function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
   const [conn, setConn] = useState<Connection | null>(null)
+  const [presence, setPresence] = useState<Record<string, Person[]>>({})
+
+  useEffect(() => {
+    const load = () => api<Record<string, Person[]>>('/presence').then(setPresence).catch(() => {})
+    load()
+    // ponytail: polling a cada 4s; trocar por webhooks do LiveKit + SSE se houver muitos usuários
+    const id = setInterval(load, 4000)
+    return () => clearInterval(id)
+  }, [conn?.room]) // recarrega na hora ao entrar/sair de um canal
 
   async function join(room: string) {
     if (conn?.room === room) return
@@ -85,9 +96,20 @@ function Lobby({ user, onLogout }: { user: string; onLogout: () => void }) {
       <nav>
         <h2>Canais de voz</h2>
         {CHANNELS.map((c) => (
-          <button key={c} className={c === conn?.room ? 'channel active' : 'channel'} onClick={() => join(c)}>
-            🔊 {c}
-          </button>
+          <div key={c}>
+            <button className={c === conn?.room ? 'channel active' : 'channel'} onClick={() => join(c)}>
+              🔊 {c}
+            </button>
+            <ul className="people">
+              {presence[c]?.map((p) => (
+                <li key={p.name}>
+                  {p.name}
+                  {p.muted && <span title="Microfone desligado"> 🔇</span>}
+                  {p.screen && <span className="live">AO VIVO</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
         <footer>
           <span>{user}</span>
