@@ -80,18 +80,23 @@ class HttpError extends Error {
 }
 
 async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
-  let raw = ''
-  for await (const chunk of req) {
-    raw += chunk
-    if (raw.length > 10_000) throw new HttpError(413, 'Corpo grande demais')
-  }
+  let body: unknown
   try {
-    const body = JSON.parse(raw || '{}')
-    if (typeof body !== 'object' || body === null) throw 0
-    return body
-  } catch {
-    throw new HttpError(400, 'JSON inválido')
+    if ('body' in req) {
+      body = req.body ?? {} // Vercel: o corpo já vem lido e parseado em req.body
+    } else {
+      let raw = ''
+      for await (const chunk of req) {
+        raw += chunk
+        if (raw.length > 10_000) throw new HttpError(413, 'Corpo grande demais')
+      }
+      body = JSON.parse(raw || '{}')
+    }
+  } catch (e) {
+    throw e instanceof HttpError ? e : new HttpError(400, 'JSON inválido')
   }
+  if (typeof body !== 'object' || body === null) throw new HttpError(400, 'JSON inválido')
+  return body as Record<string, unknown>
 }
 
 function credentials(body: Record<string, unknown>) {
@@ -105,7 +110,9 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
   const path = `${req.method} ${new URL(req.url ?? '/', 'http://x').pathname}`
 
   if (path === 'POST /register' || path === 'POST /login') {
-    if (rateLimited(req.socket.remoteAddress ?? '')) throw new HttpError(429, 'Muitas tentativas, aguarde 1 minuto')
+    // Na Vercel o socket é o proxy; o IP real vem no x-forwarded-for (preenchido pela própria Vercel)
+    const ip = process.env.VERCEL ? String(req.headers['x-forwarded-for']).split(',')[0] : req.socket.remoteAddress
+    if (rateLimited(ip ?? '')) throw new HttpError(429, 'Muitas tentativas, aguarde 1 minuto')
     const { name, password } = credentials(await readJson(req))
     if (path === 'POST /register') {
       // on conflict evita corrida entre dois cadastros simultâneos com o mesmo nome
@@ -159,7 +166,8 @@ async function route(req: IncomingMessage): Promise<[number, object]> {
   throw new HttpError(404, 'Rota não encontrada')
 }
 
-export const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+// Mesmo handler no servidor local (createServer abaixo) e na função da Vercel (api/index.ts)
+export async function handler(req: IncomingMessage, res: ServerResponse) {
   const origin = req.headers.origin
   if (origin && WEB_ORIGINS.has(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
@@ -177,7 +185,9 @@ export const server = createServer(async (req: IncomingMessage, res: ServerRespo
     body = { error: e instanceof HttpError ? e.message : 'Erro interno' }
   }
   res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body))
-})
+}
+
+export const server = createServer(handler)
 
 if (import.meta.main) {
   const port = Number(env('PORT', '3001'))
